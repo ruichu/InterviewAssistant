@@ -17,8 +17,8 @@
 - **语言**：TypeScript 5
 - **UI 组件**：shadcn/ui (基于 Radix UI)
 - **样式**：Tailwind CSS 4
-- **AI 能力**：coze-coding-dev-sdk (LLM)
-- **文件解析**：pdf-parse (PDF 文件解析)
+- **AI 能力**：coze-coding-dev-sdk (LLM + Fetch + Storage)
+- **文件解析**：FetchClient + S3Storage (PDF 文件解析)
 - **状态管理**：React Hooks (useState, useRef, useEffect)
 - **消息提示**：Sonner
 
@@ -85,6 +85,12 @@ npx tsc --noEmit
 **路径**：`POST /api/parse-pdf`
 
 **功能**：解析上传的 PDF 文件，提取文本内容
+
+**实现方式**：
+1. 使用 S3Storage 将 PDF 文件上传到对象存储
+2. 生成签名 URL
+3. 使用 FetchClient 解析 URL 上的 PDF 内容
+4. 提取并返回文本内容
 
 **请求**：
 - Content-Type: `multipart/form-data`
