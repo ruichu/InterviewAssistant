@@ -4,10 +4,12 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, FileText, Sparkles, FileQuestion, MessageSquare, Loader2, Check } from 'lucide-react';
+import { Upload, FileText, Sparkles, FileQuestion, MessageSquare, Loader2, Check, Copy, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 export default function InterviewAssistant() {
   // 状态管理
@@ -28,6 +30,9 @@ export default function InterviewAssistant() {
   const resumeFileRef = useRef<HTMLInputElement>(null);
   const jdFileRef = useRef<HTMLInputElement>(null);
   const interviewFileRef = useRef<HTMLInputElement>(null);
+  
+  // 结果卡片引用
+  const resultCardRef = useRef<HTMLDivElement>(null);
 
   // 处理文件上传
   const handleFileUpload = async (
@@ -179,6 +184,90 @@ export default function InterviewAssistant() {
       toast.error('生成面试评价失败，请重试');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 复制结果
+  const handleCopy = async () => {
+    try {
+      if (resultCardRef.current) {
+        // 获取 HTML 内容
+        const htmlContent = resultCardRef.current.innerHTML;
+        
+        // 创建一个临时的 div 来获取纯文本内容
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        const textContent = tempDiv.innerText || tempDiv.textContent;
+        
+        // 尝试复制 HTML 格式（富文本）
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const clipboardItem = new ClipboardItem({
+          'text/html': blob,
+          'text/plain': new Blob([textContent], { type: 'text/plain' })
+        });
+        
+        await navigator.clipboard.write([clipboardItem]);
+        toast.success('已复制到剪贴板（包含格式）');
+      }
+    } catch (error) {
+      console.error('复制失败:', error);
+      // 降级方案：只复制纯文本
+      try {
+        await navigator.clipboard.writeText(result);
+        toast.success('已复制到剪贴板（纯文本）');
+      } catch (e) {
+        toast.error('复制失败，请手动复制');
+      }
+    }
+  };
+
+  // 保存为 PDF
+  const handleSaveAsPdf = async () => {
+    try {
+      if (!resultCardRef.current) {
+        toast.error('没有可保存的内容');
+        return;
+      }
+
+      toast.loading('正在生成 PDF...', { id: 'pdf-loading' });
+
+      // 等待一下确保内容完全渲染
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // 使用 html2canvas 将内容转换为 canvas
+      const canvas = await html2canvas(resultCardRef.current, {
+        scale: 2, // 提高清晰度
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      // 创建 PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height],
+      });
+
+      // 添加图片到 PDF
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+
+      // 生成文件名
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = mode === 'questions' 
+        ? `面试题_${timestamp}.pdf` 
+        : `面试评价_${timestamp}.pdf`;
+
+      // 下载 PDF
+      pdf.save(filename);
+
+      toast.dismiss('pdf-loading');
+      toast.success('PDF 保存成功');
+    } catch (error) {
+      console.error('保存 PDF 失败:', error);
+      toast.dismiss('pdf-loading');
+      toast.error('保存 PDF 失败，请重试');
     }
   };
 
@@ -431,13 +520,37 @@ export default function InterviewAssistant() {
             {result && (
               <Card className="flex-1">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5" />
-                    {mode === 'questions' ? '生成的面试题' : '面试评价结果'}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5" />
+                      {mode === 'questions' ? '生成的面试题' : '面试评价结果'}
+                    </CardTitle>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleCopy}
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2"
+                        title="复制内容"
+                      >
+                        <Copy className="w-4 h-4" />
+                        <span className="hidden sm:inline">复制</span>
+                      </Button>
+                      <Button
+                        onClick={handleSaveAsPdf}
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2"
+                        title="保存为 PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span className="hidden sm:inline">保存 PDF</span>
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="prose prose-slate dark:prose-invert max-w-none prose-sm">
+                  <div ref={resultCardRef} className="prose prose-slate dark:prose-invert max-w-none prose-sm bg-white dark:bg-slate-900 p-6 rounded-lg">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
