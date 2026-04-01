@@ -16,6 +16,11 @@ export default function InterviewAssistant() {
   const [result, setResult] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'questions' | 'evaluation'>('questions');
+  
+  // 文件上传状态
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
+  const [isUploadingJd, setIsUploadingJd] = useState(false);
+  const [isUploadingInterview, setIsUploadingInterview] = useState(false);
 
   // 文件引用
   const resumeFileRef = useRef<HTMLInputElement>(null);
@@ -25,7 +30,8 @@ export default function InterviewAssistant() {
   // 处理文件上传
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
-    setText: (text: string) => void
+    setText: (text: string) => void,
+    setUploading: (loading: boolean) => void
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -38,6 +44,8 @@ export default function InterviewAssistant() {
     }
 
     try {
+      setUploading(true);
+      
       if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
         // PDF 文件处理
         const formData = new FormData();
@@ -64,6 +72,8 @@ export default function InterviewAssistant() {
     } catch (error) {
       console.error('文件上传错误:', error);
       toast.error('文件处理失败，请重试');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -205,7 +215,7 @@ export default function InterviewAssistant() {
                   <input
                     type="file"
                     ref={resumeFileRef}
-                    onChange={(e) => handleFileUpload(e, setResumeText)}
+                    onChange={(e) => handleFileUpload(e, setResumeText, setIsUploadingResume)}
                     accept=".txt,.pdf"
                     className="hidden"
                   />
@@ -214,9 +224,19 @@ export default function InterviewAssistant() {
                     variant="outline"
                     size="sm"
                     className="gap-2"
+                    disabled={isUploadingResume}
                   >
-                    <Upload className="w-4 h-4" />
-                    上传文件
+                    {isUploadingResume ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        解析中...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        上传文件
+                      </>
+                    )}
                   </Button>
                   <span className="text-xs text-muted-foreground self-center">
                     支持 TXT、PDF 格式
@@ -247,7 +267,7 @@ export default function InterviewAssistant() {
                   <input
                     type="file"
                     ref={jdFileRef}
-                    onChange={(e) => handleFileUpload(e, setJdText)}
+                    onChange={(e) => handleFileUpload(e, setJdText, setIsUploadingJd)}
                     accept=".txt,.pdf"
                     className="hidden"
                   />
@@ -256,9 +276,19 @@ export default function InterviewAssistant() {
                     variant="outline"
                     size="sm"
                     className="gap-2"
+                    disabled={isUploadingJd}
                   >
-                    <Upload className="w-4 h-4" />
-                    上传文件
+                    {isUploadingJd ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        解析中...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        上传文件
+                      </>
+                    )}
                   </Button>
                   <span className="text-xs text-muted-foreground self-center">
                     支持 TXT、PDF 格式
@@ -289,7 +319,7 @@ export default function InterviewAssistant() {
                   <input
                     type="file"
                     ref={interviewFileRef}
-                    onChange={(e) => handleFileUpload(e, setInterviewText)}
+                    onChange={(e) => handleFileUpload(e, setInterviewText, setIsUploadingInterview)}
                     accept=".txt,.pdf"
                     className="hidden"
                   />
@@ -298,9 +328,19 @@ export default function InterviewAssistant() {
                     variant="outline"
                     size="sm"
                     className="gap-2"
+                    disabled={isUploadingInterview}
                   >
-                    <Upload className="w-4 h-4" />
-                    上传文件
+                    {isUploadingInterview ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        解析中...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        上传文件
+                      </>
+                    )}
                   </Button>
                   <span className="text-xs text-muted-foreground self-center">
                     支持 TXT、PDF 格式
