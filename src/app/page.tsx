@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, FileText, Sparkles, FileQuestion, MessageSquare, Loader2, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function InterviewAssistant() {
   // 状态管理
@@ -435,10 +437,72 @@ export default function InterviewAssistant() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="prose prose-slate dark:prose-invert max-w-none">
-                    <pre className="whitespace-pre-wrap text-sm leading-relaxed">
+                  <div className="prose prose-slate dark:prose-invert max-w-none prose-sm">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({ node, ...props }) => (
+                          <h1 className="text-2xl font-bold mt-6 mb-4 text-foreground" {...props} />
+                        ),
+                        h2: ({ node, ...props }) => (
+                          <h2 className="text-xl font-semibold mt-5 mb-3 text-foreground" {...props} />
+                        ),
+                        h3: ({ node, ...props }) => (
+                          <h3 className="text-lg font-semibold mt-4 mb-2 text-foreground" {...props} />
+                        ),
+                        h4: ({ node, ...props }) => (
+                          <h4 className="text-base font-semibold mt-3 mb-2 text-foreground" {...props} />
+                        ),
+                        p: ({ node, ...props }) => (
+                          <p className="mb-4 leading-relaxed text-foreground" {...props} />
+                        ),
+                        ul: ({ node, ...props }) => (
+                          <ul className="list-disc list-inside mb-4 space-y-2 text-foreground" {...props} />
+                        ),
+                        ol: ({ node, ...props }) => (
+                          <ol className="list-decimal list-inside mb-4 space-y-2 text-foreground" {...props} />
+                        ),
+                        li: ({ node, ...props }) => (
+                          <li className="text-foreground" {...props} />
+                        ),
+                        strong: ({ node, ...props }) => (
+                          <strong className="font-bold text-foreground" {...props} />
+                        ),
+                        code: ({ node, className, children, ...props }: any) => (
+                          <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                            {children}
+                          </code>
+                        ),
+                        blockquote: ({ node, ...props }) => (
+                          <blockquote className="border-l-4 border-primary pl-4 italic my-4 text-muted-foreground" {...props} />
+                        ),
+                        hr: ({ node, ...props }) => (
+                          <hr className="my-6 border-border" {...props} />
+                        ),
+                        table: ({ node, ...props }) => (
+                          <div className="overflow-x-auto my-4">
+                            <table className="min-w-full border border-border" {...props} />
+                          </div>
+                        ),
+                        thead: ({ node, ...props }) => (
+                          <thead className="bg-muted" {...props} />
+                        ),
+                        tbody: ({ node, ...props }) => (
+                          <tbody {...props} />
+                        ),
+                        tr: ({ node, ...props }) => (
+                          <tr className="border-b border-border" {...props} />
+                        ),
+                        th: ({ node, ...props }) => (
+                          <th className="px-4 py-2 text-left font-semibold text-foreground" {...props} />
+                        ),
+                        td: ({ node, ...props }) => (
+                          <td className="px-4 py-2 text-foreground" {...props} />
+                        ),
+                      }}
+                    >
                       {result}
-                    </pre>
+                    </ReactMarkdown>
                   </div>
                 </CardContent>
               </Card>
