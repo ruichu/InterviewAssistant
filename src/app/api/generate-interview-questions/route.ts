@@ -80,7 +80,7 @@ ${supplementaryInfo}`;
     // 创建流式响应
     const stream = client.stream(messages, {
       model: 'doubao-seed-1-8-251228',
-      temperature: 0.7,
+      temperature: 0.5,
     });
 
     // 返回 SSE 流式响应
