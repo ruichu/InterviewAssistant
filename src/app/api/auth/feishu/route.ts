@@ -5,8 +5,8 @@ const FEISHU_APP_ID = process.env.LARK_APP_ID;
 const FEISHU_APP_SECRET = process.env.LARK_APP_SECRET;
 const FEISHU_REDIRECT_URI = process.env.LARK_REDIRECT_URI;
 
-// 飞书认证相关的常量
-const FEISHU_OAUTH_URL = 'https://open.feishu.cn/open-apis/authen/v1/authorize';
+// 飞书认证相关的常量（使用一致的v3 OIDC端点）
+const FEISHU_OAUTH_URL = 'https://open.feishu.cn/open-apis/authen/v3/oidc/authorize';
 const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/authen/v3/oidc/access_token';
 const FEISHU_USER_INFO_URL = 'https://open.feishu.cn/open-apis/authen/v1/user_info';
 
@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
       const authUrl = new URL(FEISHU_OAUTH_URL);
       authUrl.searchParams.set('app_id', FEISHU_APP_ID);
       authUrl.searchParams.set('redirect_uri', FEISHU_REDIRECT_URI || `${process.env.COZE_PROJECT_DOMAIN_DEFAULT}/api/auth/feishu`);
-      authUrl.searchParams.set('scope', 'openid profile email');
+      // 使用空格分隔的scope，只请求基础权限
+      authUrl.searchParams.set('scope', 'openid');
       authUrl.searchParams.set('state', state || 'interview-assistant');
 
       return NextResponse.redirect(authUrl.toString());
@@ -56,7 +57,12 @@ export async function GET(request: NextRequest) {
     const tokenData = await tokenResponse.json();
 
     if (tokenData.code !== 0) {
-      throw new Error(`获取 access_token 失败: ${tokenData.msg}`);
+      console.error('飞书OAuth错误:', {
+        code: tokenData.code,
+        msg: tokenData.msg,
+        error_code: tokenData.error_code,
+      });
+      throw new Error(`获取 access_token 失败: ${tokenData.msg} (错误码: ${tokenData.code})`);
     }
 
     const { access_token, refresh_token } = tokenData.data;
@@ -72,14 +78,18 @@ export async function GET(request: NextRequest) {
     const userInfoData = await userInfoResponse.json();
 
     if (userInfoData.code !== 0) {
-      throw new Error(`获取用户信息失败: ${userInfoData.msg}`);
+      console.error('飞书用户信息错误:', {
+        code: userInfoData.code,
+        msg: userInfoData.msg,
+      });
+      throw new Error(`获取用户信息失败: ${userInfoData.msg} (错误码: ${userInfoData.code})`);
     }
 
     const userInfo = userInfoData.data;
 
     // 设置认证 cookie
     const response = NextResponse.redirect(new URL('/', request.url));
-    
+
     response.cookies.set({
       name: COOKIE_NAME,
       value: JSON.stringify({
@@ -94,9 +104,9 @@ export async function GET(request: NextRequest) {
           avatar_thumb: userInfo.avatar_thumb,
           avatar_middle: userInfo.avatar_middle,
           avatar_big: userInfo.avatar_big,
-          email: userInfo.email,
-          mobile: userInfo.mobile,
-          country_code: userInfo.country_code,
+          email: userInfo.email || '',
+          mobile: userInfo.mobile || '',
+          country_code: userInfo.country_code || '',
         },
         expires_at: Date.now() + (tokenData.data.expires_in * 1000),
       }),

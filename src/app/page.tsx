@@ -40,12 +40,23 @@ export default function InterviewAssistant() {
       try {
         const response = await fetch('/api/auth/verify');
         const data = await response.json();
-        
+
         if (data.authenticated) {
           setIsAuthenticated(true);
           setUserInfo(data.user);
         } else {
           setIsAuthenticated(false);
+        }
+
+        // 检查URL中的错误参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const error = urlParams.get('error');
+        if (error) {
+          toast.error('飞书认证失败，请重试', {
+            description: '如果问题持续存在，请联系管理员',
+          });
+          // 清除URL中的错误参数
+          window.history.replaceState({}, '', window.location.pathname);
         }
       } catch (error) {
         console.error('检查认证状态失败:', error);
