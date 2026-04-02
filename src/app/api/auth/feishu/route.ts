@@ -104,7 +104,10 @@ export async function GET(request: NextRequest) {
     }
 
     // 设置认证 cookie（简化版，只存储必要信息）
-    const response = NextResponse.redirect(new URL('/', request.url));
+    // 从 LARK_REDIRECT_URI 中提取基础URL用于重定向
+    const redirectUri = FEISHU_REDIRECT_URI || `${process.env.COZE_PROJECT_DOMAIN_DEFAULT}/api/auth/feishu`;
+    const baseUrl = new URL(redirectUri).origin;
+    const response = NextResponse.redirect(new URL(baseUrl, request.url));
 
     response.cookies.set({
       name: COOKIE_NAME,
@@ -126,8 +129,11 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (error) {
     console.error('飞书认证错误:', error);
+    // 从 LARK_REDIRECT_URI 中提取基础URL用于重定向
+    const redirectUri = FEISHU_REDIRECT_URI || `${process.env.COZE_PROJECT_DOMAIN_DEFAULT}/api/auth/feishu`;
+    const baseUrl = new URL(redirectUri).origin;
     return NextResponse.redirect(
-      new URL('/?error=auth_failed', request.url)
+      new URL(`${baseUrl}/?error=auth_failed`, request.url)
     );
   }
 }
