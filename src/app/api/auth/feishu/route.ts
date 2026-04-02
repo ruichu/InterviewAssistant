@@ -29,8 +29,7 @@ export async function GET(request: NextRequest) {
       const authUrl = new URL(FEISHU_OAUTH_URL);
       authUrl.searchParams.set('app_id', FEISHU_APP_ID);
       authUrl.searchParams.set('redirect_uri', FEISHU_REDIRECT_URI || `${process.env.COZE_PROJECT_DOMAIN_DEFAULT}/api/auth/feishu`);
-      // 使用空格分隔的scope，只请求基础权限
-      authUrl.searchParams.set('scope', 'openid');
+      // 不传scope，使用飞书默认权限
       authUrl.searchParams.set('state', state || 'interview-assistant');
 
       return NextResponse.redirect(authUrl.toString());
