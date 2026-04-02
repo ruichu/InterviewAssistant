@@ -5,10 +5,10 @@ const FEISHU_APP_ID = process.env.LARK_APP_ID;
 const FEISHU_APP_SECRET = process.env.LARK_APP_SECRET;
 const FEISHU_REDIRECT_URI = process.env.LARK_REDIRECT_URI;
 
-// 飞书认证相关的常量（v1 authorize + v3 token，飞书推荐组合）
-const FEISHU_OAUTH_URL = 'https://open.feishu.cn/open-apis/authen/v1/authorize';
-const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/authen/v3/oidc/access_token';
-const FEISHU_USER_INFO_URL = 'https://open.feishu.cn/open-apis/authen/v1/user_info';
+// 飞书认证相关的常量（使用与Python版本一致的端点）
+const FEISHU_AUTH_INDEX_URL = 'https://open.feishu.cn/open-apis/authen/v1/index';
+const FEISHU_APP_ACCESS_TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal';
+const FEISHU_USER_ACCESS_TOKEN_URL = 'https://open.feishu.cn/open-apis/authen/v1/access_token';
 
 // Cookie 配置
 const COOKIE_NAME = 'feishu_auth_token';
@@ -17,30 +17,40 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 天
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get('code');
-  const state = searchParams.get('state');
+  const question = searchParams.get('question') || '';
 
   try {
-    // 如果没有 code，重定向到飞书授权页面
+    // 如果没有 code，重定向到飞书授权页面（使用index端点，与Python一致）
     if (!code) {
       if (!FEISHU_APP_ID) {
         throw new Error('FEISHU_APP_ID 环境变量未配置');
       }
 
-      const authUrl = new URL(FEISHU_OAUTH_URL);
-      authUrl.searchParams.set('app_id', FEISHU_APP_ID);
-      authUrl.searchParams.set('redirect_uri', FEISHU_REDIRECT_URI || `${process.env.COZE_PROJECT_DOMAIN_DEFAULT}/api/auth/feishu`);
-      // 不传scope，使用飞书默认权限
-      authUrl.searchParams.set('state', state || 'interview-assistant');
+      // 构造重定向URI
+      const redirectUri = FEISHU_REDIRECT_URI || `${process.env.COZE_PROJECT_DOMAIN_DEFAULT}/api/auth/feishu`;
+      const fullRedirectUri = question ? `${redirectUri}?question=${encodeURIComponent(question)}` : redirectUri;
+      const encodedRedirectUri = encodeURIComponent(fullRedirectUri);
 
-      return NextResponse.redirect(authUrl.toString());
+      // 使用index端点（与Python一致）
+      const authUrl = `${FEISHU_AUTH_INDEX_URL}?redirect_uri=${encodedRedirectUri}&app_id=${FEISHU_APP_ID}`;
+
+      const response = NextResponse.redirect(authUrl);
+
+      // 禁止缓存重定向响应
+      response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      response.headers.set('Expires', '0');
+
+      return response;
     }
 
-    // 使用 code 换取 access_token
+    // 使用 code 换取 access_token（与Python一致的流程）
     if (!FEISHU_APP_ID || !FEISHU_APP_SECRET) {
       throw new Error('飞书应用配置缺失');
     }
 
-    const tokenResponse = await fetch(FEISHU_TOKEN_URL, {
+    // 步骤1: 获取 app_access_token
+    const appTokenResponse = await fetch(FEISHU_APP_ACCESS_TOKEN_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -48,66 +58,63 @@ export async function GET(request: NextRequest) {
       body: JSON.stringify({
         app_id: FEISHU_APP_ID,
         app_secret: FEISHU_APP_SECRET,
+      }),
+    });
+
+    const appTokenData = await appTokenResponse.json();
+
+    if (appTokenData.code !== 0) {
+      console.error('飞书获取app_access_token错误:', {
+        code: appTokenData.code,
+        msg: appTokenData.msg,
+      });
+      throw new Error(`获取 app_access_token 失败: ${appTokenData.msg} (错误码: ${appTokenData.code})`);
+    }
+
+    const appAccessToken = appTokenData.app_access_token;
+
+    // 步骤2: 使用 app_access_token 获取用户 access_token
+    const userTokenResponse = await fetch(FEISHU_USER_ACCESS_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${appAccessToken}`,
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({
         grant_type: 'authorization_code',
         code: code,
       }),
     });
 
-    const tokenData = await tokenResponse.json();
+    const userTokenData = await userTokenResponse.json();
 
-    if (tokenData.code !== 0) {
-      console.error('飞书OAuth错误:', {
-        code: tokenData.code,
-        msg: tokenData.msg,
-        error_code: tokenData.error_code,
+    if (userTokenData.code !== 0 || userTokenData.msg !== 'success') {
+      console.error('飞书获取user_access_token错误:', {
+        code: userTokenData.code,
+        msg: userTokenData.msg,
       });
-      throw new Error(`获取 access_token 失败: ${tokenData.msg} (错误码: ${tokenData.code})`);
+      throw new Error(`获取用户 access_token 失败: ${userTokenData.msg} (错误码: ${userTokenData.code})`);
     }
 
-    const { access_token, refresh_token } = tokenData.data;
+    const userData = userTokenData.data;
+    const userName = userData.name;
 
-    // 获取用户信息
-    const userInfoResponse = await fetch(FEISHU_USER_INFO_URL, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-      },
-    });
-
-    const userInfoData = await userInfoResponse.json();
-
-    if (userInfoData.code !== 0) {
-      console.error('飞书用户信息错误:', {
-        code: userInfoData.code,
-        msg: userInfoData.msg,
-      });
-      throw new Error(`获取用户信息失败: ${userInfoData.msg} (错误码: ${userInfoData.code})`);
+    if (!userName || userName.length <= 1) {
+      throw new Error('无法获取用户名称');
     }
 
-    const userInfo = userInfoData.data;
-
-    // 设置认证 cookie
+    // 设置认证 cookie（简化版，只存储必要信息）
     const response = NextResponse.redirect(new URL('/', request.url));
 
     response.cookies.set({
       name: COOKIE_NAME,
       value: JSON.stringify({
-        access_token,
-        refresh_token,
         user_info: {
-          open_id: userInfo.open_id,
-          union_id: userInfo.union_id,
-          name: userInfo.name,
-          en_name: userInfo.en_name,
-          avatar_url: userInfo.avatar_url,
-          avatar_thumb: userInfo.avatar_thumb,
-          avatar_middle: userInfo.avatar_middle,
-          avatar_big: userInfo.avatar_big,
-          email: userInfo.email || '',
-          mobile: userInfo.mobile || '',
-          country_code: userInfo.country_code || '',
+          name: userName,
+          open_id: userData.open_id || '',
+          union_id: userData.union_id || '',
         },
-        expires_at: Date.now() + (tokenData.data.expires_in * 1000),
+        expires_at: Date.now() + (COOKIE_MAX_AGE * 1000),
       }),
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
