@@ -5,8 +5,8 @@ const FEISHU_APP_ID = process.env.LARK_APP_ID;
 const FEISHU_APP_SECRET = process.env.LARK_APP_SECRET;
 const FEISHU_REDIRECT_URI = process.env.LARK_REDIRECT_URI;
 
-// 飞书认证相关的常量（使用一致的v3 OIDC端点）
-const FEISHU_OAUTH_URL = 'https://open.feishu.cn/open-apis/authen/v3/oidc/authorize';
+// 飞书认证相关的常量（v1 authorize + v3 token，飞书推荐组合）
+const FEISHU_OAUTH_URL = 'https://open.feishu.cn/open-apis/authen/v1/authorize';
 const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/authen/v3/oidc/access_token';
 const FEISHU_USER_INFO_URL = 'https://open.feishu.cn/open-apis/authen/v1/user_info';
 
