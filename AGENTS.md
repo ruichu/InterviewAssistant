@@ -6,10 +6,11 @@
 
 ## 核心功能
 
-1. **生成面试题**：根据候选人简历、职位描述（JD）和补充信息，自动生成一套全面的面试题
-2. **生成面试评价**：根据候选人简历、职位描述（JD）、面试对话文本和补充信息，自动生成详细的面试评价报告
-3. **文件上传与解析**：支持上传 TXT 和 PDF 格式的文件，自动解析并填充到对应的文本框
-4. **流式输出**：使用 SSE 协议实现流式输出，提供更好的用户体验
+1. **飞书认证**：使用飞书 OAuth 2.0 进行身份认证，认证结果通过 Cookie 缓存 7 天
+2. **生成面试题**：根据候选人简历、职位描述（JD）和补充信息，自动生成一套全面的面试题
+3. **生成面试评价**：根据候选人简历、职位描述（JD）、面试对话文本和补充信息，自动生成详细的面试评价报告
+4. **文件上传与解析**：支持上传 TXT 和 PDF 格式的文件，自动解析并填充到对应的文本框
+5. **流式输出**：使用 SSE 协议实现流式输出，提供更好的用户体验
 
 ## 技术栈
 
@@ -29,24 +30,29 @@
 ├── src/
 │   ├── app/
 │   │   ├── api/
+│   │   │   ├── auth/
+│   │   │   │   ├── feishu/
+│   │   │   │   │   └── route.ts          # 飞书 OAuth 认证接口
+│   │   │   │   └── verify/
+│   │   │   │       └── route.ts          # 验证认证状态接口
 │   │   │   ├── parse-pdf/
-│   │   │   │   └── route.ts          # PDF 解析接口
+│   │   │   │   └── route.ts              # PDF 解析接口
 │   │   │   ├── generate-interview-questions/
-│   │   │   │   └── route.ts          # 生成面试题接口
+│   │   │   │   └── route.ts              # 生成面试题接口
 │   │   │   └── generate-interview-evaluation/
-│   │   │       └── route.ts          # 生成面试评价接口
-│   │   ├── layout.tsx                 # 根布局（包含 Toaster）
-│   │   ├── page.tsx                   # 主页面（面试助手界面）
-│   │   └── globals.css                # 全局样式
+│   │   │       └── route.ts              # 生成面试评价接口
+│   │   ├── layout.tsx                     # 根布局（包含 Toaster）
+│   │   ├── page.tsx                       # 主页面（面试助手界面）
+│   │   └── globals.css                    # 全局样式
 │   ├── components/
-│   │   └── ui/                        # shadcn/ui 组件库
-│   ├── hooks/                         # 自定义 Hooks
-│   ├── lib/                           # 工具库
-│   └── server.ts                      # 服务器配置
-├── public/                            # 静态资源
-├── .coze                              # 项目配置
-├── package.json                       # 依赖配置
-└── tsconfig.json                      # TypeScript 配置
+│   │   └── ui/                            # shadcn/ui 组件库
+│   ├── hooks/                             # 自定义 Hooks
+│   ├── lib/                               # 工具库
+│   └── server.ts                          # 服务器配置
+├── public/                                # 静态资源
+├── .coze                                  # 项目配置
+├── package.json                           # 依赖配置
+└── tsconfig.json                          # TypeScript 配置
 ```
 
 ## 构建和测试命令
@@ -79,6 +85,65 @@ npx tsc --noEmit
 ```
 
 ## API 接口说明
+
+### 0. 飞书认证接口
+
+#### 0.1 飞书 OAuth 认证
+
+**路径**：`GET /api/auth/feishu`
+
+**功能**：处理飞书 OAuth 2.0 认证流程
+
+**流程**：
+1. 如果没有 code，重定向到飞书授权页面
+2. 用户授权后，飞书重定向回应用并附带 code
+3. 使用 code 换取 access_token
+4. 使用 access_token 获取用户信息
+5. 设置认证 cookie 并重定向到首页
+
+**环境变量**：
+- `LARK_APP_ID`：飞书应用 ID（由系统环境变量提供）
+- `LARK_APP_SECRET`：飞书应用密钥（由系统环境变量提供）
+- `LARK_REDIRECT_URI`：飞书回调地址（由系统环境变量提供）
+
+#### 0.2 验证认证状态
+
+**路径**：`GET /api/auth/verify`
+
+**功能**：验证用户的认证状态
+
+**响应**：
+```json
+{
+  "authenticated": true,
+  "user": {
+    "open_id": "xxx",
+    "name": "张三",
+    "avatar_url": "https://...",
+    "email": "xxx@example.com"
+  }
+}
+```
+
+**未认证响应**：
+```json
+{
+  "authenticated": false
+}
+```
+
+#### 0.3 退出登录
+
+**路径**：`DELETE /api/auth/verify`
+
+**功能**：清除认证 cookie，退出登录
+
+**响应**：
+```json
+{
+  "success": true
+}
+```
 
 ### 1. PDF 解析接口
 
@@ -232,6 +297,12 @@ npx tsc --noEmit
 3. **输入验证**：所有用户输入必须进行验证和清理
 4. **文件上传**：严格限制文件类型（仅支持 TXT、PDF），防止恶意文件上传
 5. **错误信息**：生产环境中不暴露详细的错误堆栈信息
+6. **飞书认证**：
+   - App ID 和 App Secret 从系统环境变量 `LARK_APP_ID` 和 `LARK_APP_SECRET` 读取
+   - 不在任何文件中存储敏感信息
+   - 认证 cookie 设置为 httpOnly，防止 XSS 攻击
+   - 生产环境使用 secure cookie，仅通过 HTTPS 传输
+   - Cookie 有效期为 7 天，定期重新认证
 
 ## 性能优化
 
@@ -294,17 +365,54 @@ npx tsc --noEmit
 
 ## 飞书集成说明
 
-本应用设计为嵌入飞书应用，依赖飞书授权。具体集成步骤：
+本应用使用飞书 OAuth 2.0 进行身份认证。
 
-1. 在飞书开放平台创建应用
-2. 配置 OAuth 2.0 授权
-3. 在应用中嵌入本应用
-4. 使用飞书 JS SDK 获取用户信息和权限
-5. 根据飞书用户信息进行权限控制
+### 配置步骤
 
-## 待办事项
+1. **环境变量配置**
 
-- [ ] 集成飞书 OAuth 授权
+   确保以下环境变量已正确设置：
+
+   ```env
+   LARK_APP_ID=cli_a94faa31497adbd8
+   LARK_APP_SECRET=1CVubNtm78ZjAlzpzwizzhzqhUnCXjH0
+   LARK_REDIRECT_URI=https://your-domain.com/api/auth/feishu
+   ```
+
+   ⚠️ **重要**：
+   - 环境变量由系统自动设置，无需手动配置文件
+   - `LARK_REDIRECT_URI` 必须在飞书开放平台配置的重定向地址列表中
+   - 不要将敏感信息保存在任何文件中
+
+2. **飞书开放平台配置**
+
+   - 创建飞书应用
+   - 启用"网页应用"能力
+   - 配置重定向 URL：`https://your-domain.com/api/auth/feishu`
+   - 获取 App ID 和 App Secret
+
+3. **认证流程**
+
+   1. 用户访问应用
+   2. 应用检查认证状态（Cookie）
+   3. 如果未认证，重定向到飞书登录页面
+   4. 用户在飞书页面授权
+   5. 飞书重定向回应用并附带 code
+   6. 应用使用 code 换取 access_token
+   7. 应用获取用户信息并设置 Cookie
+   8. 用户进入主应用界面
+
+### Cookie 配置
+
+- **名称**：`feishu_auth_token`
+- **有效期**：7 天
+- **httpOnly**：true（防止 XSS 攻击）
+- **secure**：生产环境为 true
+- **sameSite**：lax
+
+### 待办事项
+
+- [x] 集成飞书 OAuth 授权
 - [ ] 添加用户权限管理
 - [ ] 实现历史记录功能
 - [ ] 添加导出功能（PDF、Word）

@@ -4,12 +4,17 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Upload, FileText, Sparkles, FileQuestion, MessageSquare, Loader2, Check, Copy, Download } from 'lucide-react';
+import { Upload, FileText, Sparkles, FileQuestion, MessageSquare, Loader2, Check, Copy, Download, LogOut, User } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 export default function InterviewAssistant() {
+  // 认证状态
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [userInfo, setUserInfo] = useState<any>(null);
+  
   // 状态管理
   const [resumeText, setResumeText] = useState('');
   const [jdText, setJdText] = useState('');
@@ -28,6 +33,43 @@ export default function InterviewAssistant() {
   const resumeFileRef = useRef<HTMLInputElement>(null);
   const jdFileRef = useRef<HTMLInputElement>(null);
   const interviewFileRef = useRef<HTMLInputElement>(null);
+
+  // 检查认证状态
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/verify');
+        const data = await response.json();
+        
+        if (data.authenticated) {
+          setIsAuthenticated(true);
+          setUserInfo(data.user);
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error('检查认证状态失败:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  // 登出
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/verify', { method: 'DELETE' });
+      setIsAuthenticated(false);
+      setUserInfo(null);
+      toast.success('已退出登录');
+    } catch (error) {
+      console.error('登出失败:', error);
+      toast.error('登出失败');
+    }
+  };
 
   // 处理文件上传
   const handleFileUpload = async (
@@ -231,20 +273,89 @@ export default function InterviewAssistant() {
     }
   };
 
+  // 如果正在检查认证状态
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">正在验证身份...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 如果未认证，显示登录界面
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <Sparkles className="w-12 h-12 text-primary" />
+            </div>
+            <CardTitle className="text-2xl">智能面试助手</CardTitle>
+            <CardDescription>
+              请使用飞书账号登录以继续使用
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              onClick={() => window.location.href = '/api/auth/feishu'}
+              className="w-full gap-2"
+              size="lg"
+            >
+              <User className="w-5 h-5" />
+              使用飞书登录
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* 标题 */}
-        <div className="text-center space-y-2 mb-8">
-          <div className="flex items-center justify-center gap-3">
-            <Sparkles className="w-10 h-10 text-primary" />
-            <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
-              智能面试助手
-            </h1>
+        {/* 标题和用户信息 */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="text-center space-y-2 flex-1">
+            <div className="flex items-center justify-center gap-3">
+              <Sparkles className="w-10 h-10 text-primary" />
+              <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
+                智能面试助手
+              </h1>
+            </div>
+            <p className="text-muted-foreground">
+              基于人工智能，自动生成面试题和面试评价
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            基于人工智能，自动生成面试题和面试评价
-          </p>
+          
+          {/* 用户信息和登出按钮 */}
+          <div className="flex items-center gap-3">
+            {userInfo && (
+              <div className="flex items-center gap-3 bg-background rounded-lg p-2 shadow-sm">
+                {userInfo.avatar_url && (
+                  <img
+                    src={userInfo.avatar_url}
+                    alt={userInfo.name}
+                    className="w-8 h-8 rounded-full"
+                  />
+                )}
+                <span className="text-sm font-medium hidden sm:inline">{userInfo.name}</span>
+                <Button
+                  onClick={handleLogout}
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2"
+                  title="退出登录"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">退出</span>
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
