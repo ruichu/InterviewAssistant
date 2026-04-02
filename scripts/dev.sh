@@ -31,4 +31,6 @@ echo "Clearing port ${PORT} before start."
 kill_port_if_listening
 echo "Starting HTTP service on port ${PORT} for dev..."
 
+# 抑制 Node.js 弃用警告（来自依赖包）
+export NODE_NO_WARNINGS=1
 PORT=$PORT pnpm tsx watch src/server.ts

@@ -10,6 +10,8 @@ DEPLOY_RUN_PORT="${DEPLOY_RUN_PORT:-$PORT}"
 start_service() {
     cd "${COZE_WORKSPACE_PATH}"
     echo "Starting HTTP service on port ${DEPLOY_RUN_PORT} for deploy..."
+    # 抑制 Node.js 弃用警告（来自依赖包）
+    export NODE_NO_WARNINGS=1
     PORT=${DEPLOY_RUN_PORT} node dist/server.js
 }
 
